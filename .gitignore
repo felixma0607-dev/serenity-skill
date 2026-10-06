@@ -3,3 +3,25 @@ __pycache__/
 *.pyc
 .env
 .venv/
+server/.token
+server/.claude_oauth_token
+server/*.log
+server/backups/
+
+# Personal data — kept out of the public fork, backed up to the private repo
+# (see scripts/backup_private.sh)
+.git-private/
+portfolio-dashboard.html
+portfolio-dashboard-archive.html
+portfolio-tracker.md
+portfolio-tracker-archive.md
+watchlist.md
+data/
+references/minervini-technical.md
+references/martin-luk-strategy.md
+aleabitoreddit_stock_mentions_dashboard.html
+CLAUDE.md
+.claude/settings.local.json
+.claude/commands/
+.playwright-mcp/
+server/job_state.json
