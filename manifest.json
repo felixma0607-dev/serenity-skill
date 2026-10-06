@@ -1,0 +1,14 @@
+{
+  "name": "Felix 持倉儀表板",
+  "short_name": "持倉儀表板",
+  "description": "Felix 的持倉/觀察名單複查儀表板",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

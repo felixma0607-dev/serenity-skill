@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>動能排行榜</title>
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="排行榜">
+<style>
+  :root {
+    --bg: #0f1115; --card: #171a21; --card-border: #262b36; --row-alt: #1b1f27;
+    --text: #e6e8ec; --text-soft: #c7cbd4; --muted: #8b93a3;
+    --green: #3ecf8e; --red: #ff6b6b; --amber: #f2a93b; --accent: #5b9dff; --purple: #b17fe0;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Segoe UI", sans-serif;
+    padding: 20px 16px 60px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 14px; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  .muted { color: var(--muted); font-size: .8rem; }
+  a.back { color: var(--accent); font-size: .85rem; text-decoration: none; margin-left: auto; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
+  .kpi { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+  .kpi .l { color: var(--muted); font-size: .7rem; }
+  .kpi .v { font-family: var(--mono); font-size: 1.25rem; font-weight: 600; }
+  .kpi .s { font-size: .72rem; color: var(--text-soft); }
+  @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--card-border); }
+  .toolbar label { font-size: .75rem; color: var(--muted); }
+  select, input, button {
+    background: var(--bg); color: var(--text); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 5px 9px; font-size: .8rem; font-family: inherit;
+  }
+  button { cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  input[type=search] { width: 120px; }
+  .count { font-family: var(--mono); font-size: .75rem; color: var(--muted); margin-left: auto; }
+
+  .panel { display: none; padding: 10px 14px; border-bottom: 1px solid var(--card-border); font-size: .8rem; color: var(--text-soft); }
+  .panel.open { display: block; }
+  .panel dl { display: grid; grid-template-columns: 90px 1fr; gap: 4px 10px; margin: 0; }
+  .panel dt { font-family: var(--mono); color: var(--text); font-weight: 600; }
+  .panel dd { margin: 0; }
+  .colpick { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .colpick label { color: var(--text-soft); font-size: .8rem; }
+
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  th, td { padding: 7px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--card-border); }
+  th { font-size: .68rem; color: var(--muted); font-weight: 600; letter-spacing: .03em; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--card); }
+  th.sorted { color: var(--accent); }
+  td { font-family: var(--mono); }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr.topn td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  tbody tr.divider td { border-bottom: 2px dashed var(--card-border); }
+  .left { text-align: left; }
+  .stick { position: sticky; left: 0; background: inherit; z-index: 1; }
+  tbody tr { background: var(--card); }
+  td.tk { text-align: left; font-family: inherit; }
+  td.tk b { font-family: var(--mono); display: block; font-size: .8rem; }
+  td.tk span { color: var(--muted); font-size: .68rem; display: block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+  .pos { color: var(--green); } .neg { color: var(--red); } .dim { color: var(--muted); }
+  .pill { display: inline-block; font-family: inherit; font-size: .68rem; padding: 1px 7px; border-radius: 999px; border: 1px solid; }
+  .z-過熱 { color: var(--amber); border-color: var(--amber); background: rgba(242,169,59,.1); }
+  .z-偏強 { color: var(--green); border-color: var(--green); background: rgba(62,207,142,.1); }
+  .z-整理 { color: var(--accent); border-color: var(--accent); background: rgba(91,157,255,.1); }
+  .z-偏弱 { color: var(--muted); border-color: var(--muted); }
+  .z-弱勢 { color: var(--red); border-color: var(--red); background: rgba(255,107,107,.1); }
+  .dots { display: inline-flex; gap: 2px; vertical-align: middle; }
+  .dots i { width: 7px; height: 12px; border-radius: 2px; background: var(--card-border); }
+  .dots i.in { background: var(--accent); }
+  .full { color: var(--purple); font-size: .7rem; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  .card h2 { font-size: .9rem; margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--card-border); }
+  .card h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent); vertical-align: middle; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 14px; }
+  .chip { border: 1px solid var(--card-border); border-radius: 8px; padding: 6px 10px; font-size: .78rem; }
+  .chip b { font-family: var(--mono); }
+  .sig { display: inline-block; font-family: inherit; font-size: .68rem; padding: 1px 7px; border-radius: 6px; }
+  .s-breakout { background: rgba(91,157,255,.18); color: var(--accent); }
+  .s-watch { color: var(--accent); }
+  .s-vol_wait { color: var(--amber); }
+  .s-shallow { background: rgba(240,196,76,.18); color: var(--amber); }
+  .half { font-size: .68rem; color: var(--amber); border: 1px solid var(--amber); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+  .vchk { font-family: inherit; font-size: .72rem; white-space: nowrap; }
+  .s-pullback { background: rgba(62,207,142,.18); color: var(--green); }
+  .s-extended { color: var(--amber); }
+  .s-stretched { color: var(--muted); }
+  .s-tighten { color: var(--purple); }
+  .orders { padding: 4px 0; }
+  .order { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 14px; border-bottom: 1px solid var(--card-border); }
+  .order:last-child { border-bottom: 0; }
+  .order .nums { font-family: var(--mono); font-size: .8rem; text-align: right; }
+  .order .note { grid-column: 1 / -1; color: var(--text-soft); font-size: .75rem; }
+  .gate { margin: 10px 14px; padding: 8px 10px; border-radius: 8px; font-size: .78rem; background: rgba(255,107,107,.1); color: var(--red); }
+  .st-pending { color: var(--muted); } .st-expired { color: var(--muted); }
+  .st-open { color: var(--accent); } .st-done { color: var(--text); } .st-stopped { color: var(--red); }
+  td.tk b .tag { display: inline-block; vertical-align: middle; color: var(--amber); border-color: var(--amber); }
+  .tag { font-size: .62rem; color: var(--muted); border: 1px solid var(--card-border); border-radius: 4px; padding: 0 4px; margin-left: 4px; font-family: inherit; }
+  .disclaim { color: var(--muted); font-size: .7rem; padding: 8px 14px 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>動能排行榜</h1>
+    <span class="muted" id="gen"></span>
+    <a class="back" href="home.html">← 我的投資</a>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card">
+    <h2>進場清單<small id="ordNote"></small></h2>
+    <div id="orders" class="orders"></div>
+    <div class="disclaim">系統依規則產生的掛單參考，不是買賣建議。只做回調買點，不追突破；回調還要「縮量＋吸籌」兩項成交量條件都成立才出訊號。🟡 淺回調勝率較低，只下半注。停損在回調低點下；先半倉，確認再加。</div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <label for="date">結構日期</label>
+      <select id="date"></select>
+      <select id="group"><option value="">全部股票</option></select>
+      <input type="search" id="q" placeholder="搜尋代號">
+      <button id="topOnly">只看 Top N</button>
+      <button id="colBtn">▥ 欄位</button>
+      <button id="helpBtn">? 欄位說明</button>
+      <button id="refresh" hidden>↻ 更新</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="panel" id="colPanel"><div class="colpick" id="colpick"></div></div>
+    <div class="panel" id="helpPanel"><dl id="help"></dl></div>
+    <div class="scroll"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h2>新強勢股發現<small id="discNote"></small></h2>
+    <div class="chips" id="disc"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>常駐榜<small id="stayNote"></small></h2>
+      <div class="chips" id="stay"></div>
+    </div>
+    <div class="card">
+      <h2>市場天氣<small>S&amp;P 500 寬度 + SPY/QQQ 趨勢、出貨日、FTD</small></h2>
+      <div class="scroll"><table>
+        <thead><tr><th class="left">交易日</th><th>分數</th><th>Δ</th><th title="S&P 500 站上 20MA / 50MA 比例">寬度</th><th class="left">SPY</th><th class="left">QQQ</th></tr></thead>
+        <tbody id="mkt"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <h2>訊號紀錄<small>紙上追蹤每個 🟢 回調 / 🟡 淺回調訊號的實際結果（回調＋縮量＋吸籌，2026-09-27 起）</small></h2>
+    <div class="toolbar">
+      <button id="armedOnly">只計可掛單的訊號</button>
+      <span class="count" id="logCount"></span>
+    </div>
+    <div class="kpis" id="logKpis" style="padding:12px 12px 0"></div>
+    <div class="scroll"><table>
+      <thead><tr><th class="left">訊號日</th><th class="left">代號</th><th class="left">類型</th><th>buy-stop</th><th>停損</th>
+        <th class="left">成交</th><th class="left">狀態</th><th>5日</th><th>10日</th><th>20日</th><th>結果</th><th>R</th></tr></thead>
+      <tbody id="logBody"></tbody>
+    </table></div>
+    <div class="disclaim" id="logRules"></div>
+  </div>
+</div>
+
+<script src="data/ranking-data.js"></script>
+<script>
+const D = window.RANKING_DATA;
+const $ = id => document.getElementById(id);
+if (!D) {
+  document.querySelector('.wrap').innerHTML +=
+    '<p class="muted">找不到 data/ranking-data.js — 先執行 <code>python3 scripts/momentum_ranker.py</code></p>';
+  throw new Error('no data');
+}
+const N = D.top_n, LB = D.lookback;
+
+const COLS = [
+  {k:'rank', t:'#', help:'當日綜合排名（SCORE 由高到低）'},
+  {k:'chg', t:'Δ名次', help:'相對前一交易日的名次變化，▲ 上升 ▼ 下跌，NEW 為新進股票池'},
+  {k:'ticker', t:'TICKER', left:true, help:'代號 / 公司名稱'},
+  {k:'spot', t:'SPOT', help:'當日收盤價'},
+  {k:'zone', t:'ZONE', help:'過熱：D20 ≥ 10% 或 D50 ≥ 25%（離均線太遠，別追）｜偏強：站上 20MA｜整理：跌破 20MA 但守 50MA｜偏弱：跌破 50MA｜弱勢：跌破 200MA'},
+  {k:'d20', t:'D20', pct:true, help:'收盤價距 20 日均線 %（短線乖離）'},
+  {k:'d50', t:'D50', pct:true, help:'收盤價距 50 日均線 %（中期趨勢）'},
+  {k:'d200', t:'D200', pct:true, off:true, help:'收盤價距 200 日均線 %（長期趨勢）'},
+  {k:'r1m', t:'1M', pct:true, help:'近 21 個交易日漲跌幅'},
+  {k:'r3m', t:'3M', pct:true, off:true, help:'近 63 個交易日漲跌幅'},
+  {k:'off_high', t:'距高點', pct:true, off:true, help:'距 52 週高點 %'},
+  {k:'rs', t:'RS', help:'IBD 式相對強度：跟 S&P 500 全部成分股比較的百分位（1–99），加權 0.4×3M + 0.2×6M + 0.2×9M + 0.2×12M。↗ = 強度線（股價 ÷ SPY）比一個月前高'},
+  {k:'rs_pool', t:'池內RS', help:'同一算法，但只跟股票池內的股票比較（池內都是強勢股，所以數字偏低）。排名 SCORE 與 🟢/🟡 訊號用這個：一年回測中，用池內 RS 篩選的訊號平均 R 較高'},
+  {k:'tt', t:'TT', help:'Minervini 趨勢模板通過數 /8：價>150/200MA、150>200MA、200MA 上彎 1 個月、50>150/200MA、價>50MA、距 52 週低點 ≥30%、距 52 週高點 ≤25%、RS（全市場）≥70 而且強度線上升'},
+  {k:'sig', t:'訊號', left:true, help:'🟢 回調買點（全注）：Stage 2（以池內 RS 計：TT≥7、池內 RS≥70）、20MA 上彎、D20 −2~+3%、站上 50MA，而且「量能」兩項都 ✓；buy-stop 在當日高點上，停損在 5 日低點下 1%（風險 1.5–8%）｜🟡 淺回調（半注）：同樣條件，但回踩的是上彎的 10MA、股價仍高於 20MA 3–12%；一年回測可多抓約一倍的大升股，但勝率約 35%（🟢 為 57%），所以只下半注｜⏸ 等量能：價格已到買點區，但縮量或吸籌未達標｜👀 突破中：接近 20 日高點，不追，等回踩｜⌛ 等收窄：停損距離不合理｜⏳ 過熱｜… 延伸中。滑鼠停在訊號上看詳情'},
+  {k:'ud20', t:'量能', left:true, help:'回調時的成交量健康度（兩項都 ✓ 才算合格）｜縮量：近 5 日平均量 < 50 日平均量，代表賣壓減少｜吸籌：20 日內上漲日的總成交量 ≥ 下跌日的 1.2 倍，代表有人在買。一年回測中，兩項同時成立的回調勝率 57%、平均 +1.69R；只看縮量 53%、+1.24R；完全不看成交量 44%、+0.75R'},
+  {k:'earn', t:'業績', off:true, help:'下次公布業績的日期（Nasdaq/Zacks）。帶 ? 的是按公司過去的時間推算，未經公司確認'},
+  {k:'score', t:'SCORE', help:'0.5×池內RS + 0.3×TT% + 0.2×1M 動能百分位'},
+  {k:'hits', t:`近${LB}日`, help:`近 ${LB} 個交易日有幾天在 Top ${N}（格子由舊到新）`},
+  {k:'streak', t:'連續', help:`連續在 Top ${N} 的交易日數（受回溯天數上限）`},
+];
+
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem('rk.' + k)) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem('rk.' + k, JSON.stringify(v)); } catch {} } };
+let hidden = new Set(store.get('hidden', COLS.filter(c => c.off).map(c => c.k)));
+let sortKey = 'rank', sortDir = 1, topOnly = store.get('topOnly', false);
+let date = D.dates[D.dates.length - 1];
+
+const fmtPct = v => v == null ? '<span class="dim">—</span>' : `<span class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
+const fmtNum = v => v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+function dots(ticker) {
+  const i = D.dates.indexOf(date), win = D.dates.slice(Math.max(0, i - LB + 1), i + 1);
+  return '<span class="dots">' + win.map(d => {
+    const r = D.snapshots[d].find(x => x.ticker === ticker);
+    return `<i class="${r && r.rank <= N ? 'in' : ''}" title="${d} #${r ? r.rank : '—'}"></i>`;
+  }).join('') + '</span>';
+}
+
+function cell(c, r) {
+  const v = r[c.k];
+  if (c.pct) return fmtPct(v);
+  switch (c.k) {
+    case 'ticker': return `<b>${r.ticker}${r.lev ? `<span class="tag" title="${r.lev} 倍槓桿 ETF：過熱/回調門檻按倍數放寬，不參與其他股票的 RS 排名與市場溫度">${r.lev}x</span>` : ''}</b><span>${r.name}</span>`;
+    case 'spot': return fmtNum(v);
+    case 'zone': return `<span class="pill z-${v}">${v}</span>`;
+    case 'chg': return v == null ? '<span class="dim">NEW</span>' : v > 0 ? `<span class="pos">▲${v}</span>` : v < 0 ? `<span class="neg">▼${-v}</span>` : '<span class="dim">–</span>';
+    case 'rs': return v == null ? '<span class="dim">—</span>' : `${v}${r.rs_line_up ? ' <span class="pos" title="強度線比一個月前高">↗</span>' : ' <span class="dim" title="強度線未上升">→</span>'}`;
+    case 'tt': return `<span class="${v >= 7 ? 'pos' : v <= 4 ? 'neg' : ''}">${v}/8</span>`;
+    case 'hits': return `${dots(r.ticker)} ${v}/${LB}${v === LB ? ' <span class="full">★</span>' : ''}`;
+    case 'sig': {
+      if (!v) return '<span class="dim">—</span>';
+      const lab = {breakout: '🔵 突破', shallow: '🟡 淺回調', vol_wait: '⏸ 等量能', watch: '👀 突破中', pullback: '🟢 回調', tighten: '⌛ 等收窄', extended: '⏳ 過熱', stretched: '… 延伸'}[v];
+      const tip = r.entry ? `buy-stop ${fmtNum(r.entry)} / 停損 ${fmtNum(r.stop)}（${r.stop_basis}下）/ 風險 ${r.risk}% — ${r.note}` : r.note;
+      return `<span class="sig s-${v}" title="${tip}">${lab}</span>`;
+    }
+    case 'ud20': {
+      if (r.v5_50 == null && v == null) return '<span class="dim">—</span>';
+      const dry = r.v5_50 != null && r.v5_50 < 1, acc = v != null && v >= 1.2;
+      return `<span class="vchk" title="近5日量 ÷ 50日均量 = ${r.v5_50 ?? '—'}；20日上漲量 ÷ 下跌量 = ${v ?? '—'}">` +
+        `<span class="${dry ? 'pos' : 'dim'}">${dry ? '✓' : '✗'} 縮量</span> <span class="${acc ? 'pos' : 'dim'}">${acc ? '✓' : '✗'} 吸籌</span></span>`;
+    }
+    case 'earn': {
+      if (!v) return '<span class="dim">—</span>';
+      const days = Math.round((new Date(v) - new Date(date)) / 864e5);
+      return `<span class="${days >= 0 && days <= 10 ? 'neg' : ''}" title="${r.earn_kind === 'announced' ? '公司已公布' : '估計日期'}">${v.slice(5).replace('-', '/')}${r.earn_kind === 'announced' ? '' : '?'}</span>`;
+    }
+    case 'streak': return v ? v + 'd' : '<span class="dim">—</span>';
+    default: return v ?? '—';
+  }
+}
+
+function renderTable() {
+  const cols = COLS.filter(c => !hidden.has(c.k));
+  $('thead').innerHTML = cols.map(c =>
+    `<th data-k="${c.k}" class="${c.left ? 'left' : ''} ${c.k === 'ticker' ? 'stick' : ''} ${sortKey === c.k ? 'sorted' : ''}">${c.t}${sortKey === c.k ? (sortDir > 0 ? ' ↑' : ' ↓') : ' ⇅'}</th>`).join('');
+  const q = $('q').value.trim().toUpperCase();
+  const all = D.snapshots[date];
+  const grp = $('group').value, members = grp ? new Set((D.groups || {})[grp] || []) : null;
+  let rows = all.filter(r => (!topOnly || r.rank <= N) && (!members || members.has(r.ticker)) && (!q || r.ticker.includes(q) || r.name.toUpperCase().includes(q)));
+  rows = rows.slice().sort((a, b) => {
+    let x = a[sortKey], y = b[sortKey];
+    if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sortDir;
+  });
+  $('tbody').innerHTML = rows.map(r => {
+    const cls = [r.rank <= N ? 'topn' : '', sortKey === 'rank' && sortDir > 0 && r.rank === N ? 'divider' : ''].join(' ');
+    return `<tr class="${cls}">` + cols.map(c => `<td class="${c.k === 'ticker' ? 'tk stick' : ''}">${cell(c, r)}</td>`).join('') + '</tr>';
+  }).join('');
+  $('count').textContent = `${rows.length} / ${all.length}`;
+}
+
+function renderKpis() {
+  const m = D.market.find(x => x.date === date), rows = D.snapshots[date];
+  const hot = rows.filter(r => r.zone === '過熱').length, strong = rows.filter(r => r.zone === '偏強').length;
+  const stay = rows.filter(r => r.hits === LB).length;
+  const tone = (m.score >= 70 ? '☀️ 晴天' : m.score >= 50 ? '⛅ 多雲' : m.score >= 30 ? '☁️ 陰天' : '🌧️ 下雨') + (m.ftd_ok ? '' : ' · 未有 FTD');
+  const d = m.delta == null ? '' : `<span class="${m.delta >= 0 ? 'pos' : 'neg'}">Δ ${m.delta >= 0 ? '+' : ''}${m.delta}</span>`;
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="l">市場天氣</div><div class="v">${m.score}</div><div class="s">${tone} ${d}</div></div>
+    <div class="kpi"><div class="l">站上 20MA / 50MA</div><div class="v">${m.breadth20.toFixed(0)}% / ${m.breadth50.toFixed(0)}%</div><div class="s">S&amp;P 500 寬度（股票池 ${m.pool_breadth20 != null ? m.pool_breadth20.toFixed(0) + '%' : '—'}）</div></div>
+    <div class="kpi"><div class="l">過熱 / 偏強</div><div class="v">${hot} / ${strong}</div><div class="s">共 ${rows.length} 檔</div></div>
+    <div class="kpi"><div class="l">${LB} 天都在 Top ${N}</div><div class="v">${stay}</div><div class="s">常駐強勢股</div></div>`;
+}
+
+function renderStay() {
+  const rows = D.snapshots[date].filter(r => r.hits >= LB - 1).sort((a, b) => b.hits - a.hits || a.rank - b.rank);
+  $('stayNote').textContent = `近 ${LB} 日在 Top ${N} ≥ ${LB - 1} 天`;
+  $('stay').innerHTML = rows.length ? rows.map(r =>
+    `<div class="chip"><b>${r.ticker}</b> ${r.hits}/${LB} ${r.hits === LB ? '<span class="full">★</span>' : ''} <span class="pill z-${r.zone}">${r.zone}</span> <span class="dim">#${r.rank}</span></div>`).join('')
+    : '<span class="muted">暫無</span>';
+}
+
+function renderMarket() {
+  $('mkt').innerHTML = D.market.slice().reverse().slice(0, 15).map(m => `
+    <tr class="${m.date === date ? 'topn' : ''}"><td class="left">${m.date}</td><td>${m.score.toFixed(1)}</td>
+    <td>${m.delta == null ? '<span class="dim">—</span>' : `<span class="${m.delta >= 0 ? 'pos' : 'neg'}">${m.delta >= 0 ? '+' : ''}${m.delta.toFixed(1)}</span>`}</td>
+    <td>${m.breadth20.toFixed(0)}% / ${m.breadth50.toFixed(0)}%</td>
+    ${['SPY', 'QQQ'].map(t => { const x = (m.indexes || {})[t]; return `<td class="left">${x ? `${x.label}<span class="dim"> · 出貨${x.dist20}</span>` : '—'}</td>`; }).join('')}</tr>`).join('');
+}
+
+// how many shares so a stop-out costs RISK% of the account (🟡 half), plus an earnings warning
+function sizeLine(r) {
+  const A = D.account, out = [];
+  if (A && r.entry > r.stop) {
+    const budget = A.total * A.risk_pct / 100 * (r.sig === 'shallow' ? 0.5 : 1);
+    const n = Math.floor(budget / (r.entry - r.stop)), amt = n * r.entry;
+    out.push(n > 0
+      ? `建議 <b>${n} 股</b> ≈ $${Math.round(amt).toLocaleString()}（停損最多蝕 $${Math.round(n * (r.entry - r.stop)).toLocaleString()}，總資產 ${(r.sig === 'shallow' ? A.risk_pct / 2 : A.risk_pct)}%）` +
+        (amt > A.cash ? ` <span class="neg">⚠️ 現金只有 $${Math.round(A.cash).toLocaleString()}，不夠</span>` : '')
+      : `<span class="neg">一股的風險已超過預算 $${Math.round(budget)}，不買</span>`);
+  }
+  if (r.earn) {
+    const days = Math.round((new Date(r.earn) - new Date(date)) / 864e5);
+    if (days >= 0 && days <= 10) out.push(`<span class="neg">⚠️ ${days} 日後公布業績${r.earn_kind === 'announced' ? '' : '（估計）'}：業績後跳空，停損保護不到</span>`);
+  }
+  return out.length ? `<div class="note" style="grid-column:1/-1">${out.join(' · ')}</div>` : '';
+}
+
+function renderOrders() {
+  const m = D.market.find(x => x.date === date);
+  const rows = D.snapshots[date].filter(r => r.sig === 'pullback' || r.sig === 'shallow').sort((a, b) => a.rank - b.rank);
+  $('ordNote').textContent = `${date} 收盤後產生 · 依排名排序`;
+  const gate = (m.score < 50 || !m.ftd_ok) ? `<div class="gate">市場天氣 ${m.score}${m.ftd_ok ? '' : '，SPY/QQQ 未有 FTD'}：訊號先「備而不掛」，等天氣 ≥ 50 而且出現 FTD 再下單</div>` : '';
+  $('orders').innerHTML = gate + (rows.length ? rows.map(r => `
+    <div class="order">
+      <div><span class="sig s-${r.sig}">${r.sig === 'shallow' ? '🟡 淺回調' : '🟢 回調買點'}</span>${r.sig === 'shallow' ? '<span class="half">只下半注</span>' : ''}
+        <b style="font-family:var(--mono);margin-left:6px">${r.ticker}</b> <span class="dim">#${r.rank} · ${r.hits}/${LB}日在榜 · RS ${r.rs} · TT ${r.tt}/8</span></div>
+      <div class="nums">buy-stop <b>${fmtNum(r.entry)}</b> <span class="dim">(${r.gap >= 0 ? '+' : ''}${r.gap}%)</span><br>
+        停損 <b>${fmtNum(r.stop)}</b> <span class="dim">${r.stop_basis}下</span> <span class="neg">−${r.risk}%</span></div>
+      <div class="note">${r.note}${r.vol_ratio != null ? ` · 當日量 ${r.vol_ratio}× 均量` : ''} · 10日振幅 ${r.tight}%</div>
+      ${sizeLine(r)}
+    </div>`).join('') : '<div class="order"><span class="muted">今天沒有符合條件的 setup — 等待也是一種操作</span></div>');
+}
+
+let armedOnly = store.get('armedOnly', true);
+function renderLog() {
+  const R = D.signal_rules || {order_days: 5, horizons: [5, 10, 20]};
+  const all = D.signals || [];
+  const rows = all.filter(r => !armedOnly || r.armed);
+  const filled = rows.filter(r => r.fill != null), resolved = rows.filter(r => r.status !== 'pending');
+  const avg = xs => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+  const closedR = filled.filter(r => ['done', 'stopped'].includes(r.status)).map(r => r.r).filter(v => v != null);
+  const tile = (l, v, s) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  const hz = R.horizons.map(h => {
+    const v = filled.map(r => r['ret' + h]).filter(x => x != null);
+    const a = avg(v);
+    return tile(`${h} 日平均`, a == null ? '—' : fmtPct(a), v.length ? `勝率 ${Math.round(v.filter(x => x > 0).length / v.length * 100)}% · n=${v.length}` : 'n=0');
+  });
+  const ar = avg(closedR);
+  $('logKpis').innerHTML = [
+    tile('訊號 / 成交', `${rows.length} / ${filled.length}`, resolved.length ? `成交率 ${Math.round(filled.length / resolved.length * 100)}%` : ''),
+    tile('停損 / 持有中', `${rows.filter(r => r.status === 'stopped').length} / ${rows.filter(r => r.status === 'open').length}`,
+      `平均 R ${ar == null ? '—' : (ar >= 0 ? '+' : '') + ar.toFixed(2)}（已結束 ${closedR.length} 筆）`),
+    ...hz].join('');
+  $('logKpis').style.gridTemplateColumns = 'repeat(auto-fit, minmax(140px, 1fr))';
+  const ST = {pending: '等待成交', expired: '未成交過期', open: '持有中', done: '20日到期', stopped: '停損'};
+  const ret = v => v == null ? '<span class="dim">—</span>' : fmtPct(v);
+  $('logBody').innerHTML = rows.slice().reverse().map(r => `<tr>
+    <td class="left">${r.date}${r.backfill ? '<span class="tag" title="系統上線前的日子，用當時數據重算">回溯</span>' : ''}</td>
+    <td class="left"><b>${r.ticker}</b>${r.armed ? '' : '<span class="tag" title="當日市場天氣 < 50 或未有 FTD，規則上不掛單">未掛</span>'}</td>
+    <td class="left"><span class="sig s-${r.sig}">${{breakout: '🔵 突破', shallow: '🟡 淺回調'}[r.sig] || '🟢 回調'}</span></td>
+    <td>${fmtNum(r.entry)}</td><td>${fmtNum(r.stop)}</td>
+    <td class="left">${r.fill ? `${r.fill_date.slice(5)} @ ${fmtNum(r.fill)}` : '<span class="dim">—</span>'}</td>
+    <td class="left"><span class="st-${r.status}">${ST[r.status]}</span>${r.exit ? ` <span class="dim">${r.exit_date.slice(5)} @ ${fmtNum(r.exit)}</span>` : ''}</td>
+    ${R.horizons.map(h => `<td>${ret(r['ret' + h])}</td>`).join('')}
+    <td>${ret(r.ret)}</td><td>${r.r == null ? '<span class="dim">—</span>' : `<span class="${r.r >= 0 ? 'pos' : 'neg'}">${r.r >= 0 ? '+' : ''}${r.r.toFixed(2)}</span>`}</td>
+  </tr>`).join('') || `<tr><td class="left" colspan="12"><span class="muted">還沒有紀錄</span></td></tr>`;
+  $('logCount').textContent = `${rows.length} / ${all.length} 筆`;
+  $('logRules').textContent = `模擬規則：buy-stop 在訊號後 ${R.order_days} 個交易日內有效，當日最高價 ≥ buy-stop 即成交（跳空高開按開盤價成交）；` +
+    `成交後最低價 ≤ 停損即出場（跳空低開按開盤價，成交當日也算），${R.horizons.join('/')} 日報酬已計入停損。同一代號在紀錄未結束前不重複記錄。` +
+    `R = 結果 ÷ 成交時的風險。不計手續費、滑價、半倉加碼。「回溯」是系統上線前的日子，用當時數據重算，不是即時記錄。`;
+}
+$('armedOnly').onclick = () => { armedOnly = !armedOnly; store.set('armedOnly', armedOnly); $('armedOnly').classList.toggle('on', armedOnly); renderLog(); };
+$('armedOnly').classList.toggle('on', armedOnly);
+
+function renderDiscover() {
+  const x = D.discover;
+  if (!x) { $('disc').innerHTML = '<span class="dim">重新執行排行榜後才有資料</span>'; return; }
+  $('discNote').textContent = `${x.date} · S&P 500 成分股中，不在股票池、趨勢模板 8/8、全市場 RS ≥ ${x.min_rs} 而且強度線上升：共 ${x.total} 隻（顯示前 ${x.rows.length}）。只是研究線索，不是買入訊號；有興趣才加入股票池`;
+  $('disc').innerHTML = x.rows.length ? x.rows.map(r =>
+    `<div class="chip" title="${r.name}｜D20 ${r.d20}%｜D50 ${r.d50}%｜3M ${r.r3m}%｜距高點 ${r.off_high}%"><b style="font-family:var(--mono)">${r.ticker}</b> <span class="dim">RS ${r.rs}</span> <span class="pill z-${r.zone}">${r.zone}</span> <span class="dim">D20 ${r.d20 >= 0 ? '+' : ''}${r.d20}%</span></div>`).join('')
+    : '<span class="dim">今天沒有符合條件的新股票</span>';
+}
+
+function renderAll() { renderOrders(); renderKpis(); renderTable(); renderStay(); renderDiscover(); renderMarket(); }
+
+// controls
+$('gen').textContent = `更新 ${D.generated} · 資料至 ${D.dates[D.dates.length - 1]}`;
+$('date').innerHTML = D.dates.slice().reverse().map((d, i) => `<option value="${d}">${d}${i === 0 ? ' · 最新' : ''}</option>`).join('');
+$('date').onchange = e => { date = e.target.value; renderAll(); };
+$('q').oninput = renderTable;
+$('group').innerHTML += Object.keys(D.groups || {}).map(g => `<option value="${g}">${g}</option>`).join('');
+$('group').value = store.get('group', '');
+if (!(D.groups || {})[$('group').value]) $('group').value = '';
+$('group').onchange = () => { store.set('group', $('group').value); renderTable(); };
+const syncTop = () => { $('topOnly').classList.toggle('on', topOnly); $('topOnly').textContent = `只看 Top ${N}`; };
+$('topOnly').onclick = () => { topOnly = !topOnly; store.set('topOnly', topOnly); syncTop(); renderTable(); };
+$('colBtn').onclick = () => $('colPanel').classList.toggle('open');
+$('helpBtn').onclick = () => $('helpPanel').classList.toggle('open');
+$('help').innerHTML = COLS.map(c => `<dt>${c.t}</dt><dd>${c.help}</dd>`).join('') +
+  `<dt>市場天氣</dt><dd>0–100 分：S&P 500 站上 20MA 比例（25 分）＋站上 50MA 比例（25 分）＋SPY/QQQ 趨勢（價>21EMA、價>50MA、50MA>200MA，20 分）＋出貨日（近 20 日 0–2 次滿分、3–4 次一半、5 次以上 0 分，15 分）＋市場狀態（確認上升 1、上升受壓 ½、反彈嘗試 ⅓、調整中 0，15 分）。≥70 ☀️、50–70 ⛅、30–50 ☁️、&lt;30 🌧️。訊號要「天氣 ≥ 50 而且 SPY 或 QQQ 有 FTD」才會掛單</dd>`;
+$('colpick').innerHTML = COLS.filter(c => !['rank', 'ticker'].includes(c.k)).map(c =>
+  `<label><input type="checkbox" data-k="${c.k}" ${hidden.has(c.k) ? '' : 'checked'}> ${c.t}</label>`).join('');
+$('colpick').onchange = e => { const k = e.target.dataset.k; e.target.checked ? hidden.delete(k) : hidden.add(k); store.set('hidden', [...hidden]); renderTable(); };
+$('thead').onclick = e => {
+  const th = e.target.closest('th'); if (!th) return;
+  const k = th.dataset.k;
+  if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = ['rank', 'ticker', 'zone', 'sig'].includes(k) ? 1 : -1; }
+  renderTable();
+};
+if (document.cookie.includes('pf_token=')) {  // only when served by portfolio_server.py
+  const b = $('refresh'); b.hidden = false;
+  b.onclick = async () => {
+    b.disabled = true; b.textContent = '更新中…';
+    try {
+      const r = await fetch('/api/ranking/refresh', {method: 'POST'});
+      if (r.ok) return location.reload();
+      b.textContent = r.status === 409 ? '已在更新' : '更新失敗';
+    } catch { b.textContent = '更新失敗'; }
+    b.disabled = false;
+  };
+}
+syncTop(); renderAll(); renderLog();
+</script>
+</body>
+</html>
